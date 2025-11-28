@@ -3,7 +3,7 @@ import { connectDB } from './config/db.js';
 import { userRoute } from './routes/Users.js';
 
 const app = express();
-const PORT = 3000;
+const PORT = 4000;
 
 connectDB();
 app.use(express.json());
