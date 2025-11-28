@@ -1,4 +1,72 @@
-name: Deploy Node App
+# name: Deploy Node App
+
+# on:
+#   push:
+#     branches:
+#       - main
+
+# jobs:
+#   build:
+#     runs-on: ubuntu-latest
+#     steps:
+#       # Checkout code
+#       - name: Checkout Source
+#         uses: actions/checkout@v4
+
+#       # Login to Docker Hub
+#       - name: Login to Docker Hub
+#         run: echo ${{ secrets.DOCKER_PASSWORD }} | docker login -u ${{ secrets.DOCKER_USERNAME }} --password-stdin
+
+#       # Build Docker image
+#       - name: Build Docker Image
+#         run: docker build -t adeelmalik0014/node-backend:latest .
+
+#       # Push Docker image
+#       - name: Publish Image to Docker Hub
+#         run: docker push adeelmalik0014/node-backend:latest
+
+#   deploy:
+#     needs: build
+#     runs-on:
+#       - self-hosted
+#       - Linux
+#       - X64
+#     steps:
+#       # Pull latest Docker image
+#       - name: Pull Docker Image
+#         run: docker pull adeelmalik0014/node-backend:latest
+
+#       # Stop and remove old container if exists
+#       - name: Stop & Remove Old Container
+#         run: |
+#           if [ "$(docker ps -aq -f name=nodejs-app-container)" ]; then
+#             docker stop nodejs-app-container || true
+#             docker rm nodejs-app-container || true
+#           fi
+
+#       # Remove old image (optional)
+#       - name: Remove Old Docker Image
+#         run: |
+#           if [ "$(docker images -q adeelmalik0014/node-backend:previous)" ]; then
+#             docker rmi adeelmalik0014/node-backend:previous || true
+#           fi
+#           docker tag adeelmalik0014/node-backend:latest adeelmalik0014/node-backend:previous
+
+#       # Run the container with restart policy and proper env
+#       - name: Run Docker Container
+#         run: |
+#           docker run -d \
+#             --restart unless-stopped \
+#             -p 4000:4000 \
+#             --name nodejs-app-container \
+#             -e MONGO_URI="${{ secrets.MONGO_URI }}" \
+#             adeelmalik0014/node-backend:latest
+
+#       # Show last 50 lines of container logs (avoid hanging)
+#       - name: Show Container Logs
+#         run: docker logs --tail 50 nodejs-app-container
+
+name: Build and Push to ECR
 
 on:
   push:
@@ -6,62 +74,30 @@ on:
       - main
 
 jobs:
-  build:
+  build-and-push:
     runs-on: ubuntu-latest
+
     steps:
-      # Checkout code
-      - name: Checkout Source
+      - name: Checkout code
         uses: actions/checkout@v4
 
-      # Login to Docker Hub
-      - name: Login to Docker Hub
-        run: echo ${{ secrets.DOCKER_PASSWORD }} | docker login -u ${{ secrets.DOCKER_USERNAME }} --password-stdin
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ap-south-1
 
-      # Build Docker image
-      - name: Build Docker Image
-        run: docker build -t adeelmalik0014/node-backend:latest .
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
 
-      # Push Docker image
-      - name: Publish Image to Docker Hub
-        run: docker push adeelmalik0014/node-backend:latest
-
-  deploy:
-    needs: build
-    runs-on:
-      - self-hosted
-      - Linux
-      - X64
-    steps:
-      # Pull latest Docker image
-      - name: Pull Docker Image
-        run: docker pull adeelmalik0014/node-backend:latest
-
-      # Stop and remove old container if exists
-      - name: Stop & Remove Old Container
+      - name: Build, Tag, and Push image to ECR
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          ECR_REPOSITORY: my-backend
+          IMAGE_TAG: latest
         run: |
-          if [ "$(docker ps -aq -f name=nodejs-app-container)" ]; then
-            docker stop nodejs-app-container || true
-            docker rm nodejs-app-container || true
-          fi
-
-      # Remove old image (optional)
-      - name: Remove Old Docker Image
-        run: |
-          if [ "$(docker images -q adeelmalik0014/node-backend:previous)" ]; then
-            docker rmi adeelmalik0014/node-backend:previous || true
-          fi
-          docker tag adeelmalik0014/node-backend:latest adeelmalik0014/node-backend:previous
-
-      # Run the container with restart policy and proper env
-      - name: Run Docker Container
-        run: |
-          docker run -d \
-            --restart unless-stopped \
-            -p 4000:4000 \
-            --name nodejs-app-container \
-            -e MONGO_URI="${{ secrets.MONGO_URI }}" \
-            adeelmalik0014/node-backend:latest
-
-      # Show last 50 lines of container logs (avoid hanging)
-      - name: Show Container Logs
-        run: docker logs --tail 50 nodejs-app-container
+          docker build -t $ECR_REPOSITORY .
+          docker tag $ECR_REPOSITORY:latest $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
