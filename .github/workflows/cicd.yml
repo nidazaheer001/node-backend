@@ -14,7 +14,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Login to Docker Hub
-        run: docker login -u ${{ secrets.DOCKER_USERNAME }} -p ${{ secrets.DOCKER_PASSWORD }}
+        run: echo ${{ secrets.DOCKER_PASSWORD }} | docker login -u ${{ secrets.DOCKER_USERNAME }} --password-stdin
 
       - name: Build Docker Image
         run: docker build -t adeelmalik0014/node-backend .
@@ -24,10 +24,26 @@ jobs:
 
   deploy:
     needs: build
-    runs-on: self-hosted
+    runs-on:
+      - self-hosted
+      - Linux
+      - X64
+
     steps:
-      - name: Pull image from the docker hub
+      - name: Pull Docker Image
         run: docker pull adeelmalik0014/node-backend:latest
 
-      - name: Run Docker container
-        run: docker run -d -p 4000:4000 --name nodejs-app-container -e MONGO_PASSWORD='${{ secrets.MONGO_PASSWORD }}' adeelmalik0014/node-backend
+      - name: Stop & Remove Old Container
+        run: |
+          if [ "$(docker ps -aq -f name=nodejs-app-container)" ]; then
+            docker stop nodejs-app-container || true
+            docker rm nodejs-app-container || true
+          fi
+
+      - name: Run Docker Container
+        run: |
+          docker run -d \
+            -p 4000:4000 \
+            --name nodejs-app-container \
+            -e MONGO_PASSWORD="${{ secrets.MONGO_PASSWORD }}" \
+            adeelmalik0014/node-backend:latest
