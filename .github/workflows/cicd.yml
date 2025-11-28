@@ -36,11 +36,10 @@ jobs:
       - name: Pull Docker Image
         run: docker pull adeelmalik0014/node-backend:latest
 
-      # Stop and remove old container
+      # Stop and remove old container if exists
       - name: Stop & Remove Old Container
         run: |
           if [ "$(docker ps -aq -f name=nodejs-app-container)" ]; then
-            echo "Stopping existing container..."
             docker stop nodejs-app-container || true
             docker rm nodejs-app-container || true
           fi
@@ -53,7 +52,7 @@ jobs:
           fi
           docker tag adeelmalik0014/node-backend:latest adeelmalik0014/node-backend:previous
 
-      # Run the container with restart policy and proper MONGO_URI
+      # Run the container with restart policy and proper env
       - name: Run Docker Container
         run: |
           docker run -d \
@@ -63,6 +62,6 @@ jobs:
             -e MONGO_URI="${{ secrets.MONGO_URI }}" \
             adeelmalik0014/node-backend:latest
 
-      # Show container logs for verification
+      # Show last 50 lines of container logs (avoid hanging)
       - name: Show Container Logs
-        run: docker logs -f nodejs-app-container
+        run: docker logs --tail 50 nodejs-app-container
