@@ -9,15 +9,19 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
+      # Checkout code
       - name: Checkout Source
         uses: actions/checkout@v4
 
+      # Login to Docker Hub
       - name: Login to Docker Hub
         run: echo ${{ secrets.DOCKER_PASSWORD }} | docker login -u ${{ secrets.DOCKER_USERNAME }} --password-stdin
 
+      # Build Docker image
       - name: Build Docker Image
-        run: docker build -t adeelmalik0014/node-backend .
+        run: docker build -t adeelmalik0014/node-backend:latest .
 
+      # Push Docker image
       - name: Publish Image to Docker Hub
         run: docker push adeelmalik0014/node-backend:latest
 
@@ -28,20 +32,38 @@ jobs:
       - Linux
       - X64
     steps:
+      # Pull latest Docker image
       - name: Pull Docker Image
         run: docker pull adeelmalik0014/node-backend:latest
 
+      # Stop and remove old container
       - name: Stop & Remove Old Container
         run: |
           if [ "$(docker ps -aq -f name=nodejs-app-container)" ]; then
+            echo "Stopping existing container..."
             docker stop nodejs-app-container || true
             docker rm nodejs-app-container || true
           fi
 
+      # Remove old image (optional, avoids clutter)
+      - name: Remove Old Docker Image
+        run: |
+          if [ "$(docker images -q adeelmalik0014/node-backend:previous)" ]; then
+            docker rmi adeelmalik0014/node-backend:previous || true
+          fi
+          # Tag current image as previous
+          docker tag adeelmalik0014/node-backend:latest adeelmalik0014/node-backend:previous
+
+      # Run the container with restart policy
       - name: Run Docker Container
         run: |
           docker run -d \
+            --restart unless-stopped \
             -p 4000:4000 \
             --name nodejs-app-container \
             -e MONGO_PASSWORD="${{ secrets.MONGO_PASSWORD }}" \
             adeelmalik0014/node-backend:latest
+
+      # Show container logs for verification
+      - name: Show Container Logs
+        run: docker logs -f nodejs-app-container

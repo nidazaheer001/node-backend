@@ -5,8 +5,8 @@ FROM node:alpine3.18
 WORKDIR /app
 
 # Copy package.json and install dependencies
-COPY package.json ./
-RUN npm install
+COPY package.json package-lock.json* ./
+RUN npm install --production
 
 # Copy the rest of the code
 COPY . .
@@ -15,4 +15,4 @@ COPY . .
 EXPOSE 4000
 
 # Start the app
-CMD ["npm", "start"]
+CMD ["node", "src/server.js"]
